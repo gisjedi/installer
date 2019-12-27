@@ -1,0 +1,34 @@
+[
+  {
+    "ParameterKey": "InfrastructureName", 
+    "ParameterValue": "test-58rqq" 
+  },
+  {
+    "ParameterKey": "RhcosAmi", 
+    "ParameterValue": "ami-0bc59aaa7363b805d" 
+  },
+  {
+    "ParameterKey": "Subnet", 
+    "ParameterValue": "subnet-0e4c2be1f9e71182f" 
+  },
+  {
+    "ParameterKey": "WorkerSecurityGroupId", 
+    "ParameterValue": "sg-008623fefc3c3c043" 
+  },
+  {
+    "ParameterKey": "IgnitionLocation", 
+    "ParameterValue": "https://api-int.test.openshift.gisjedi.com:22623/config/worker" 
+  },
+  {
+    "ParameterKey": "CertificateAuthorities", 
+    "ParameterValue": "" 
+  },
+  {
+    "ParameterKey": "WorkerInstanceProfileName", 
+    "ParameterValue": "ocp-security-WorkerInstanceProfile-JQR6AJEQ5DMT" 
+  },
+  {
+    "ParameterKey": "WorkerInstanceType", 
+    "ParameterValue": "m4.large" 
+  }
+]

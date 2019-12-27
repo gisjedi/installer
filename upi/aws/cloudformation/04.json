@@ -1,0 +1,50 @@
+[
+  {
+    "ParameterKey": "InfrastructureName", 
+    "ParameterValue": "test-58rqq" 
+  },
+  {
+    "ParameterKey": "RhcosAmi", 
+    "ParameterValue": "ami-0bc59aaa7363b805d" 
+  },
+  {
+    "ParameterKey": "AllowedBootstrapSshCidr", 
+    "ParameterValue": "0.0.0.0/0" 
+  },
+  {
+    "ParameterKey": "PublicSubnet", 
+    "ParameterValue": "subnet-0626a327b93190e2f" 
+  },
+  {
+    "ParameterKey": "MasterSecurityGroupId", 
+    "ParameterValue": "sg-0486f84f819fcda34" 
+  },
+  {
+    "ParameterKey": "VpcId", 
+    "ParameterValue": "vpc-075b3a058c5be34d9" 
+  },
+  {
+    "ParameterKey": "BootstrapIgnitionLocation", 
+    "ParameterValue": "s3://gisjedi-test-infra/bootstrap.ign" 
+  },
+  {
+    "ParameterKey": "AutoRegisterELB", 
+    "ParameterValue": "yes" 
+  },
+  {
+    "ParameterKey": "RegisterNlbIpTargetsLambdaArn", 
+    "ParameterValue": "arn:aws:lambda:us-east-2:105483174239:function:ocp-infra-RegisterNlbIpTargets-WIV350VJ9RVQ" 
+  },
+  {
+    "ParameterKey": "ExternalApiTargetGroupArn", 
+    "ParameterValue": "arn:aws:elasticloadbalancing:us-east-2:105483174239:targetgroup/ocp-i-Exter-1L5AG3NMHYE4F/d8b446fdce2a11df" 
+  },
+  {
+    "ParameterKey": "InternalApiTargetGroupArn", 
+    "ParameterValue": "arn:aws:elasticloadbalancing:us-east-2:105483174239:targetgroup/ocp-i-Inter-M3K255MVPE4V/b24cec26c65d260c" 
+  },
+  {
+    "ParameterKey": "InternalServiceTargetGroupArn", 
+    "ParameterValue": "arn:aws:elasticloadbalancing:us-east-2:105483174239:targetgroup/ocp-i-Inter-EEIK56Z08SA1/56ab9c4d38e4c823" 
+  }
+]

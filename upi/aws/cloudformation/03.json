@@ -1,0 +1,18 @@
+[
+  {
+    "ParameterKey": "InfrastructureName", 
+    "ParameterValue": "test-58rqq" 
+  },
+  {
+    "ParameterKey": "VpcCidr", 
+    "ParameterValue": "10.0.0.0/16" 
+  },
+  {
+    "ParameterKey": "PrivateSubnets", 
+    "ParameterValue": "subnet-0e4c2be1f9e71182f" 
+  },
+  {
+    "ParameterKey": "VpcId", 
+    "ParameterValue": "vpc-075b3a058c5be34d9" 
+  }
+]
