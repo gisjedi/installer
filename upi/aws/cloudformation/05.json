@@ -1,0 +1,74 @@
+[
+  {
+    "ParameterKey": "InfrastructureName", 
+    "ParameterValue": "test-58rqq" 
+  },
+  {
+    "ParameterKey": "RhcosAmi", 
+    "ParameterValue": "ami-0bc59aaa7363b805d" 
+  },
+  {
+    "ParameterKey": "AutoRegisterDNS", 
+    "ParameterValue": "yes" 
+  },
+  {
+    "ParameterKey": "PrivateHostedZoneId", 
+    "ParameterValue": "Z04599251B80KY8BL3GEW" 
+  },
+  {
+    "ParameterKey": "PrivateHostedZoneName", 
+    "ParameterValue": "test.openshift.gisjedi.com" 
+  },
+  {
+    "ParameterKey": "Master0Subnet", 
+    "ParameterValue": "subnet-0e4c2be1f9e71182f" 
+  },
+  {
+    "ParameterKey": "Master1Subnet", 
+    "ParameterValue": "subnet-0e4c2be1f9e71182f" 
+  },
+  {
+    "ParameterKey": "Master2Subnet", 
+    "ParameterValue": "subnet-0e4c2be1f9e71182f" 
+  },
+  {
+    "ParameterKey": "MasterSecurityGroupId", 
+    "ParameterValue": "sg-0486f84f819fcda34" 
+  },
+  {
+    "ParameterKey": "IgnitionLocation", 
+    "ParameterValue": "https://api-int.test.openshift.gisjedi.com:22623/config/master" 
+  },
+  {
+    "ParameterKey": "CertificateAuthorities", 
+    "ParameterValue": "data:text/plain;charset=utf-8;base64,ABC...xYz==" 
+  },
+  {
+    "ParameterKey": "MasterInstanceProfileName", 
+    "ParameterValue": "ocp-security-MasterInstanceProfile-XF5DJW87ZJ2G" 
+  },
+  {
+    "ParameterKey": "MasterInstanceType", 
+    "ParameterValue": "m4.xlarge" 
+  },
+  {
+    "ParameterKey": "AutoRegisterELB", 
+    "ParameterValue": "yes" 
+  },
+  {
+    "ParameterKey": "RegisterNlbIpTargetsLambdaArn", 
+    "ParameterValue": "arn:aws:lambda:us-east-2:105483174239:function:ocp-infra-RegisterNlbIpTargets-WIV350VJ9RVQ" 
+  },
+  {
+    "ParameterKey": "ExternalApiTargetGroupArn", 
+    "ParameterValue": "arn:aws:elasticloadbalancing:us-east-2:105483174239:targetgroup/ocp-i-Exter-1L5AG3NMHYE4F/d8b446fdce2a11df" 
+  },
+  {
+    "ParameterKey": "InternalApiTargetGroupArn", 
+    "ParameterValue": "arn:aws:elasticloadbalancing:us-east-2:105483174239:targetgroup/ocp-i-Inter-M3K255MVPE4V/b24cec26c65d260c" 
+  },
+  {
+    "ParameterKey": "InternalServiceTargetGroupArn", 
+    "ParameterValue": "arn:aws:elasticloadbalancing:us-east-2:105483174239:targetgroup/ocp-i-Inter-EEIK56Z08SA1/56ab9c4d38e4c823" 
+  }
+]
