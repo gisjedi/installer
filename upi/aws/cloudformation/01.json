@@ -5,7 +5,7 @@
   },
   {
     "ParameterKey": "AvailabilityZoneCount", 
-    "ParameterValue": "1" 
+    "ParameterValue": "3" 
   },
   {
     "ParameterKey": "SubnetBits", 
