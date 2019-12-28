@@ -8,25 +8,6 @@
 
 set -e
 
-wait_for_stack_complete()
-{
-    STACK=$1
-    SLEEP_TIME=5
-    BLOCKED_VAL = 'CREATE_IN_PROGRESS'
-    SUCCESS_VAL = 'CREATE_COMPLETE'
-    while [ "$(aws cloudformation describe-stacks --stack-name $STACK | jq '.Stacks[].StackStatus')" == "$BLOCKED_VAL" ]
-    do
-        sleep $SLEEP_TIME
-        echo "Waiting $SLEEP_TIME seconds for stack $STACK to complete..."
-    done
-
-    if [ "$(aws cloudformation describe-stacks --stack-name $STACK | jq '.Stacks[].StackStatus')" != "$SUCCESS_VAL" ]
-    then
-        echo "Stack $STACK creation failed."
-        exit 1
-    fi
-}
-
 # Clean up any populated files from previous runs:
 rm -f *.populated.json
 
@@ -100,7 +81,7 @@ cat 04.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .Paramete
 
 # Create bootstrap node and wait for it to be fully initialized
 aws cloudformation create-stack --stack-name $INF_NAME-bootstrap --template-body file://04_cluster_bootstrap.yaml --parameters file://04.populated.json --capabilities CAPABILITY_IAM
-sh scripts/stack-wait.sh $INF_NAME-boostrap
+sh scripts/stack-wait.sh $INF_NAME-bootstrap
 
 # Populate master nodes with needed config from upstream stacks
 cat 05.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' \
