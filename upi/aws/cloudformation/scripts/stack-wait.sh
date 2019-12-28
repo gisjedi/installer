@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
 
+# Description: Block in steps of 10 seconds until a CloudFormation stack has completed.
+
 STACK=$1
 SLEEP_TIME=10
 BLOCKED_VAL='CREATE_IN_PROGRESS'
