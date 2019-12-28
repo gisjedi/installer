@@ -6,6 +6,7 @@ STACK=$1
 SLEEP_TIME=10
 BLOCKED_VAL='CREATE_IN_PROGRESS'
 SUCCESS_VAL='CREATE_COMPLETE'
+
 while [ "$(aws cloudformation describe-stacks --stack-name $STACK | jq '.Stacks[].StackStatus' -r)" == "$BLOCKED_VAL" ]
 do
     sleep $SLEEP_TIME
