@@ -94,7 +94,7 @@ cat 05.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .Paramete
 | jq 'map((select(.ParameterKey == "MasterSecurityGroupId") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-security MasterSecurityGroupId)'")' \
 | jq 'map((select(.ParameterKey == "IgnitionLocation") | .ParameterValue) |= "'$(echo "https://api-int.$DIR.$HOSTED_ZONE_NAME:22623/config/master")'")' \
 | jq 'map((select(.ParameterKey == "CertificateAuthorities") | .ParameterValue) |= "'$(jq '.ignition.security.tls.certificateAuthorities[].source' -r $DIR/master.ign)'")' \
-| jq 'map((select(.ParameterKey == "MasterInstanceProfileName") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-security MasterInstanceProfileName)'")' \
+| jq 'map((select(.ParameterKey == "MasterInstanceProfileName") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-security MasterInstanceProfile)'")' \
 | jq 'map((select(.ParameterKey == "RegisterNlbIpTargetsLambdaArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra RegisterNlbIpTargetsLambda)'")' \
 | jq 'map((select(.ParameterKey == "ExternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra ExternalApiTargetGroupArn)'")' \
 | jq 'map((select(.ParameterKey == "InternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalApiTargetGroupArn)'")' \
