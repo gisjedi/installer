@@ -99,7 +99,7 @@ cat 04.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .Paramete
 | jq 'map((select(.ParameterKey == "InternalServiceTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalServiceTargetGroupArn)'")' > 04.populated.json
 
 # Create bootstrap node and wait for it to be fully initialized
-aws cloudformation create-stack --stack-name $INF_NAME-bootstrap --template-body file://04_cluster_security.yaml --parameters file://04.populated.json --capabilities CAPABILITY_IAM
+aws cloudformation create-stack --stack-name $INF_NAME-bootstrap --template-body file://04_cluster_bootstrap.yaml --parameters file://04.populated.json --capabilities CAPABILITY_IAM
 sh scripts/stack-wait.sh $INF_NAME-boostrap
 
 # Populate master nodes with needed config from upstream stacks
