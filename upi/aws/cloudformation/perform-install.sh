@@ -14,16 +14,17 @@ rm -f *.populated.json
 export DIR="upi"
 export BUCKET="gisjedi-test-infra"
 export HOSTED_ZONE_NAME="openshift.gisjedi.com"
+export WORKER_COUNT=3
 export HOSTED_ZONE_ID="$(aws route53 list-hosted-zones-by-name --dns-name openshift.gisjedi.com | jq '.HostedZones[].Id' -r | cut -d/ -f3)"
 
 # Generate initial configs
-./openshift-install create install-config --dir=$DIR
+openshift-install create install-config --dir=$DIR
 
 # Clean up for UPI
 yq w -i $DIR/install-config.yaml 'compute[*].replicas' 0
  
 # Generate K8s manifests and ignition
-./openshift-install create manifests --dir=$DIR
+openshift-install create manifests --dir=$DIR
 
 # Removing K8s operators for ControlPlane and Workers, we are doing that with CF stacks
 rm -f $DIR/openshift/99_openshift-cluster-api_master-machines-*.yaml
@@ -33,7 +34,7 @@ rm -f $DIR/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 yq w -i $DIR/manifests/cluster-scheduler-02-config.yml spec.mastersSchedulable false
 
 # Create ignition configs from the K8s manifests
-./openshift-install create ignition-configs --dir=$DIR
+openshift-install create ignition-configs --dir=$DIR
 
 # Copy bootstrap ignition to bucket
 aws s3 cp $DIR/bootstrap.ign s3://$BUCKET/$DIR/bootstrap.ign
@@ -116,8 +117,15 @@ cat 06.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .Paramete
 # Create master nodes
 aws cloudformation create-stack --stack-name $INF_NAME-master --template-body file://05_cluster_master_nodes.yaml --parameters file://05.populated.json
 
-# Create work nodes
-aws cloudformation create-stack --stack-name $INF_NAME-worker --template-body file://06_cluster_worker_node.yaml --parameters file://06.populated.json
+# Create worker nodes
+for WORKER_ID in $(seq 1 $WORKER_COUNT)
+do
+    aws cloudformation create-stack --stack-name $INF_NAME-worker-$WORKER_ID --template-body file://06_cluster_worker_node.yaml --parameters file://06.populated.json
+done
 
 sh scripts/stack-wait.sh $INF_NAME-master
-sh scripts/stack-wait.sh $INF_NAME-worker
+for WORKER_ID in $(seq 1 $WORKER_COUNT); do sh scripts/stack-wait.sh $INF_NAME-worker-$WORKER_ID; done
+
+# Validate that bootstrap and install are complete
+openshift-install wait-for bootstrap-complete --dir=$DIR --log-level=info 
+openshift-install wait-for install-complete --dir=$DIR --log-level=info 
