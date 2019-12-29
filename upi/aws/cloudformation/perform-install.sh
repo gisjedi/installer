@@ -8,42 +8,54 @@
 
 set -e
 
-# Clean up any populated files from previous runs:
-rm -f *.populated.json
+# Configurable defaults
+: ${DIR:="upi"}
+: ${REGION:="us-east-2"}
+: ${BUCKET:="gisjedi-test-infra"}
+: ${PUBLIC_KEY:="$(cat $HOME/.ssh/id_rsa.pub)"}
+: ${HOSTED_ZONE_NAME:="openshift.gisjedi.com"}
+: ${WORKER_COUNT:=2}
 
-export DIR="upi"
-export BUCKET="gisjedi-test-infra"
-export HOSTED_ZONE_NAME="openshift.gisjedi.com"
-export WORKER_COUNT=3
-export HOSTED_ZONE_ID="$(aws route53 list-hosted-zones-by-name --dns-name openshift.gisjedi.com | jq '.HostedZones[].Id' -r | cut -d/ -f3)"
+# Unset required values
+if [[ "${PULL_SECRET}x" == "x" ]]
+then
+    echo Missing PULL_SECRET environment variable!
+    echo This value can be found at https://cloud.redhat.com/openshift/install/aws/installer-provisioned
+    exit 1
+fi
+HOSTED_ZONE_ID="$(aws route53 list-hosted-zones-by-name --dns-name $HOSTED_ZONE_NAME | jq '.HostedZones[0].Id' -r | cut -d/ -f3)"
 
-# Generate initial configs
-openshift-install create install-config --dir=$DIR
+# Generate initial configs (can be done interactively by openshift-install create install-config --dir=$DIR)
+mkdir -p $DIR
+cat templates/install-config.yaml \
+    | yq w - baseDomain $HOSTED_ZONE_NAME \
+    | yq w - platform.aws.region $REGION \
+    | yq w - metadata.name $DIR \
+    | yq w - sshKey "$PUBLIC_KEY" \
+    | yq w - pullSecret $PULL_SECRET > $DIR/install-config.yaml
 
-# Clean up for UPI
-yq w -i $DIR/install-config.yaml 'compute[*].replicas' 0
- 
 # Generate K8s manifests and ignition
 openshift-install create manifests --dir=$DIR
 
-# Removing K8s operators for ControlPlane and Workers, we are doing that with CF stacks
+# Removing K8s operators for Master and Worker machines, we are creating them with CF stacks
 rm -f $DIR/openshift/99_openshift-cluster-api_master-machines-*.yaml
 rm -f $DIR/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 
-# Patch for router Pods failing to run on control plane machines will not be reachable by the ingress load balancer.
+# Patch for router Pods failing to run on Master machines since is not reachable by the ingress load balancer.
 yq w -i $DIR/manifests/cluster-scheduler-02-config.yml spec.mastersSchedulable false
 
 # Create ignition configs from the K8s manifests
 openshift-install create ignition-configs --dir=$DIR
 
 # Copy bootstrap ignition to bucket
+aws s3 mb s3://$BUCKET --region $REGION || true
 aws s3 cp $DIR/bootstrap.ign s3://$BUCKET/$DIR/bootstrap.ign
 
 # Grab auto-generated infrastructure name 
 export INF_NAME=$(jq -r .infraID $DIR/metadata.json)
 
 # Deploy VPC stack
-aws cloudformation create-stack --stack-name $INF_NAME-vpc --template-body file://01_vpc.yaml --parameters file://01.json
+aws cloudformation create-stack --stack-name $INF_NAME-vpc --template-body file://01_vpc.yaml --parameters file://templates/01.json
 sh scripts/stack-wait.sh $INF_NAME-vpc
 
 OUTPUTS="$(aws cloudformation describe-stacks --stack-name $INF_NAME-vpc | jq '.Stacks[].Outputs[]' -r)"
@@ -52,25 +64,25 @@ PUBLIC_SUBNET_IDS="$(sh scripts/cf-output.sh $INF_NAME-vpc PublicSubnetIds)"
 PRIVATE_SUBNET_IDS="$(sh scripts/cf-output.sh $INF_NAME-vpc PrivateSubnetIds)"
 VPC_ID="$(sh scripts/cf-output.sh $INF_NAME-vpc VpcId)"
 
-cat 02.json | jq 'map((select(.ParameterKey == "ClusterName") | .ParameterValue) |= "'$(echo $DIR)'")' \
+cat templates/02.json | jq 'map((select(.ParameterKey == "ClusterName") | .ParameterValue) |= "'$(echo $DIR)'")' \
 | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' \
 | jq 'map((select(.ParameterKey == "HostedZoneId") | .ParameterValue) |= "'$(echo $HOSTED_ZONE_ID)'")' \
 | jq 'map((select(.ParameterKey == "HostedZoneName") | .ParameterValue) |= "'$(echo $HOSTED_ZONE_NAME)'")' \
 | jq 'map((select(.ParameterKey == "PublicSubnets") | .ParameterValue) |= "'$(echo $PUBLIC_SUBNET_IDS)'")' \
 | jq 'map((select(.ParameterKey == "PrivateSubnets") | .ParameterValue) |= "'$(echo $PRIVATE_SUBNET_IDS)'")' \
-| jq 'map((select(.ParameterKey == "VpcId") | .ParameterValue) |= "'$(echo $VPC_ID)'")' > 02.populated.json
+| jq 'map((select(.ParameterKey == "VpcId") | .ParameterValue) |= "'$(echo $VPC_ID)'")' > $DIR/02.json
 
-cat 03.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' \
+cat templates/03.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' \
 | jq 'map((select(.ParameterKey == "PrivateSubnets") | .ParameterValue) |= "'$(echo $PRIVATE_SUBNET_IDS)'")' \
-| jq 'map((select(.ParameterKey == "VpcId") | .ParameterValue) |= "'$(echo $VPC_ID)'")' > 03.populated.json
+| jq 'map((select(.ParameterKey == "VpcId") | .ParameterValue) |= "'$(echo $VPC_ID)'")' > $DIR/03.json
 
 # Deploy infrastructure and security stacks
-aws cloudformation create-stack --stack-name $INF_NAME-infra --template-body file://02_cluster_infra.yaml --parameters file://02.populated.json --capabilities CAPABILITY_NAMED_IAM
-aws cloudformation create-stack --stack-name $INF_NAME-security --template-body file://03_cluster_security.yaml --parameters file://03.populated.json --capabilities CAPABILITY_IAM
+aws cloudformation create-stack --stack-name $INF_NAME-infra --template-body file://02_cluster_infra.yaml --parameters file://$DIR/02.json --capabilities CAPABILITY_NAMED_IAM || true
+aws cloudformation create-stack --stack-name $INF_NAME-security --template-body file://03_cluster_security.yaml --parameters file://$DIR/03.json --capabilities CAPABILITY_IAM || true
 sh scripts/stack-wait.sh $INF_NAME-infra
 sh scripts/stack-wait.sh $INF_NAME-security
 
-cat 04.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' \
+cat templates/04.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' \
 | jq 'map((select(.ParameterKey == "PublicSubnet") | .ParameterValue) |= "'$(echo $PUBLIC_SUBNET_IDS)'")' \
 | jq 'map((select(.ParameterKey == "MasterSecurityGroupId") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-security MasterSecurityGroupId)'")' \
 | jq 'map((select(.ParameterKey == "VpcId") | .ParameterValue) |= "'$(echo $VPC_ID)'")' \
@@ -78,14 +90,14 @@ cat 04.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .Paramete
 | jq 'map((select(.ParameterKey == "RegisterNlbIpTargetsLambdaArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra RegisterNlbIpTargetsLambda)'")' \
 | jq 'map((select(.ParameterKey == "ExternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra ExternalApiTargetGroupArn)'")' \
 | jq 'map((select(.ParameterKey == "InternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalApiTargetGroupArn)'")' \
-| jq 'map((select(.ParameterKey == "InternalServiceTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalServiceTargetGroupArn)'")' > 04.populated.json
+| jq 'map((select(.ParameterKey == "InternalServiceTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalServiceTargetGroupArn)'")' > $DIR/04.json
 
 # Create bootstrap node and wait for it to be fully initialized
-aws cloudformation create-stack --stack-name $INF_NAME-bootstrap --template-body file://04_cluster_bootstrap.yaml --parameters file://04.populated.json --capabilities CAPABILITY_IAM
+aws cloudformation create-stack --stack-name $INF_NAME-bootstrap --template-body file://04_cluster_bootstrap.yaml --parameters file://$DIR/04.json --capabilities CAPABILITY_IAM || true
 sh scripts/stack-wait.sh $INF_NAME-bootstrap
 
 # Populate master nodes with needed config from upstream stacks
-cat 05.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' \
+cat templates/05.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' \
 | jq 'map((select(.ParameterKey == "PublicSubnet") | .ParameterValue) |= "'$(echo $PUBLIC_SUBNET_IDS)'")' \
 | jq 'map((select(.ParameterKey == "PrivateHostedZoneId") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra PrivateHostedZoneId)'")' \
 | jq 'map((select(.ParameterKey == "PrivateHostedZoneName") | .ParameterValue) |= "'$(echo $DIR.$HOSTED_ZONE_NAME)'")' \
@@ -99,10 +111,10 @@ cat 05.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .Paramete
 | jq 'map((select(.ParameterKey == "RegisterNlbIpTargetsLambdaArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra RegisterNlbIpTargetsLambda)'")' \
 | jq 'map((select(.ParameterKey == "ExternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra ExternalApiTargetGroupArn)'")' \
 | jq 'map((select(.ParameterKey == "InternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalApiTargetGroupArn)'")' \
-| jq 'map((select(.ParameterKey == "InternalServiceTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalServiceTargetGroupArn)'")' > 05.populated.json
+| jq 'map((select(.ParameterKey == "InternalServiceTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalServiceTargetGroupArn)'")' > $DIR/05.json
 
 # Populate worker nodes with needed config from upstream stacks
-cat 06.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' \
+cat templates/06.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' \
 | jq 'map((select(.ParameterKey == "Subnet") | .ParameterValue) |= "'$(echo $PRIVATE_SUBNET_IDS)'")' \
 | jq 'map((select(.ParameterKey == "WorkerSecurityGroupId") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-security WorkerSecurityGroupId)'")' \
 | jq 'map((select(.ParameterKey == "IgnitionLocation") | .ParameterValue) |= "'$(echo "https://api-int.$DIR.$HOSTED_ZONE_NAME:22623/config/worker")'")' \
@@ -111,16 +123,16 @@ cat 06.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .Paramete
 | jq 'map((select(.ParameterKey == "RegisterNlbIpTargetsLambdaArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra RegisterNlbIpTargetsLambda)'")' \
 | jq 'map((select(.ParameterKey == "ExternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra ExternalApiTargetGroupArn)'")' \
 | jq 'map((select(.ParameterKey == "InternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalApiTargetGroupArn)'")' \
-| jq 'map((select(.ParameterKey == "InternalServiceTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalServiceTargetGroupArn)'")' > 06.populated.json
+| jq 'map((select(.ParameterKey == "InternalServiceTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalServiceTargetGroupArn)'")' > $DIR/06.json
 
 
 # Create master nodes
-aws cloudformation create-stack --stack-name $INF_NAME-master --template-body file://05_cluster_master_nodes.yaml --parameters file://05.populated.json
+aws cloudformation create-stack --stack-name $INF_NAME-master --template-body file://05_cluster_master_nodes.yaml --parameters file://$DIR/05.json
 
 # Create worker nodes
 for WORKER_ID in $(seq 1 $WORKER_COUNT)
 do
-    aws cloudformation create-stack --stack-name $INF_NAME-worker-$WORKER_ID --template-body file://06_cluster_worker_node.yaml --parameters file://06.populated.json
+    aws cloudformation create-stack --stack-name $INF_NAME-worker-$WORKER_ID --template-body file://06_cluster_worker_node.yaml --parameters file://$DIR/06.json
 done
 
 sh scripts/stack-wait.sh $INF_NAME-master
