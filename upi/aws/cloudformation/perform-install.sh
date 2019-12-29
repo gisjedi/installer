@@ -14,7 +14,7 @@ set -e
 : ${BUCKET:="gisjedi-test-infra"}
 : ${PUBLIC_KEY:="$(cat $HOME/.ssh/id_rsa.pub)"}
 : ${HOSTED_ZONE_NAME:="openshift.gisjedi.com"}
-: ${WORKER_COUNT:=2}
+: ${WORKER_COUNT:=3}
 
 # Unset required values
 if [[ "${PULL_SECRET}x" == "x" ]]
