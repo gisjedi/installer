@@ -64,36 +64,35 @@ PUBLIC_SUBNET_IDS="$(sh scripts/cf-output.sh $INF_NAME-vpc PublicSubnetIds)"
 PRIVATE_SUBNET_IDS="$(sh scripts/cf-output.sh $INF_NAME-vpc PrivateSubnetIds)"
 VPC_ID="$(sh scripts/cf-output.sh $INF_NAME-vpc VpcId)"
 
-cat templates/02.json | jq 'map((select(.ParameterKey == "ClusterName") | .ParameterValue) |= "'$(echo $DIR)'")' \
+cat templates/02.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' > $DIR/02.json
+
+cat templates/03.json | jq 'map((select(.ParameterKey == "ClusterName") | .ParameterValue) |= "'$(echo $DIR)'")' \
 | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' \
 | jq 'map((select(.ParameterKey == "HostedZoneId") | .ParameterValue) |= "'$(echo $HOSTED_ZONE_ID)'")' \
 | jq 'map((select(.ParameterKey == "HostedZoneName") | .ParameterValue) |= "'$(echo $HOSTED_ZONE_NAME)'")' \
 | jq 'map((select(.ParameterKey == "PublicSubnets") | .ParameterValue) |= "'$(echo $PUBLIC_SUBNET_IDS)'")' \
 | jq 'map((select(.ParameterKey == "PrivateSubnets") | .ParameterValue) |= "'$(echo $PRIVATE_SUBNET_IDS)'")' \
-| jq 'map((select(.ParameterKey == "VpcId") | .ParameterValue) |= "'$(echo $VPC_ID)'")' > $DIR/02.json
-
-cat templates/03.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' \
-| jq 'map((select(.ParameterKey == "PrivateSubnets") | .ParameterValue) |= "'$(echo $PRIVATE_SUBNET_IDS)'")' \
 | jq 'map((select(.ParameterKey == "VpcId") | .ParameterValue) |= "'$(echo $VPC_ID)'")' > $DIR/03.json
 
 # Deploy infrastructure and security stacks
-aws cloudformation create-stack --stack-name $INF_NAME-infra --template-body file://02_cluster_infra.yaml --parameters file://$DIR/02.json --capabilities CAPABILITY_NAMED_IAM || true
-aws cloudformation create-stack --stack-name $INF_NAME-security --template-body file://03_cluster_security.yaml --parameters file://$DIR/03.json --capabilities CAPABILITY_IAM || true
-sh scripts/stack-wait.sh $INF_NAME-infra
-sh scripts/stack-wait.sh $INF_NAME-security
+aws cloudformation create-stack --stack-name $INF_NAME-iam --template-body file://02_iam.yaml --parameters file://$DIR/02.json --capabilities CAPABILITY_NAMED_IAM || true
+aws cloudformation create-stack --stack-name $INF_NAME-network-security --template-body file://03_cluster_network_security.yaml --parameters file://$DIR/03.json || true
+sh scripts/stack-wait.sh $INF_NAME-iam
+sh scripts/stack-wait.sh $INF_NAME-network-security
 
 cat templates/04.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' \
 | jq 'map((select(.ParameterKey == "PublicSubnet") | .ParameterValue) |= "'$(echo $PUBLIC_SUBNET_IDS)'")' \
-| jq 'map((select(.ParameterKey == "MasterSecurityGroupId") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-security MasterSecurityGroupId)'")' \
+| jq 'map((select(.ParameterKey == "MasterSecurityGroupId") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-network-security MasterSecurityGroupId)'")' \
 | jq 'map((select(.ParameterKey == "VpcId") | .ParameterValue) |= "'$(echo $VPC_ID)'")' \
+| jq 'map((select(.ParameterKey == "BootstrapInstanceProfileName") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-iam BootstrapInstanceProfile)'")' \
 | jq 'map((select(.ParameterKey == "BootstrapIgnitionLocation") | .ParameterValue) |= "'$(echo s3://$BUCKET/$DIR/bootstrap.ign)'")' \
-| jq 'map((select(.ParameterKey == "RegisterNlbIpTargetsLambdaArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra RegisterNlbIpTargetsLambda)'")' \
-| jq 'map((select(.ParameterKey == "ExternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra ExternalApiTargetGroupArn)'")' \
-| jq 'map((select(.ParameterKey == "InternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalApiTargetGroupArn)'")' \
-| jq 'map((select(.ParameterKey == "InternalServiceTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalServiceTargetGroupArn)'")' > $DIR/04.json
+| jq 'map((select(.ParameterKey == "RegisterNlbIpTargetsLambdaArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-network-security RegisterNlbIpTargetsLambda)'")' \
+| jq 'map((select(.ParameterKey == "ExternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-network-security ExternalApiTargetGroupArn)'")' \
+| jq 'map((select(.ParameterKey == "InternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-network-security InternalApiTargetGroupArn)'")' \
+| jq 'map((select(.ParameterKey == "InternalServiceTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-network-security InternalServiceTargetGroupArn)'")' > $DIR/04.json
 
 # Create bootstrap node and wait for it to be fully initialized
-aws cloudformation create-stack --stack-name $INF_NAME-bootstrap --template-body file://04_cluster_bootstrap.yaml --parameters file://$DIR/04.json --capabilities CAPABILITY_IAM || true
+aws cloudformation create-stack --stack-name $INF_NAME-bootstrap --template-body file://04_cluster_bootstrap.yaml --parameters file://$DIR/04.json || true
 sh scripts/stack-wait.sh $INF_NAME-bootstrap
 
 # Populate master nodes with needed config from upstream stacks
@@ -104,10 +103,10 @@ cat templates/05.json | jq 'map((select(.ParameterKey == "InfrastructureName") |
 | jq 'map((select(.ParameterKey == "Master0Subnet") | .ParameterValue) |= "'$(echo $PRIVATE_SUBNET_IDS)'")' \
 | jq 'map((select(.ParameterKey == "Master1Subnet") | .ParameterValue) |= "'$(echo $PRIVATE_SUBNET_IDS)'")' \
 | jq 'map((select(.ParameterKey == "Master2Subnet") | .ParameterValue) |= "'$(echo $PRIVATE_SUBNET_IDS)'")' \
-| jq 'map((select(.ParameterKey == "MasterSecurityGroupId") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-security MasterSecurityGroupId)'")' \
+| jq 'map((select(.ParameterKey == "MasterSecurityGroupId") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-network-security MasterSecurityGroupId)'")' \
 | jq 'map((select(.ParameterKey == "IgnitionLocation") | .ParameterValue) |= "'$(echo "https://api-int.$DIR.$HOSTED_ZONE_NAME:22623/config/master")'")' \
 | jq 'map((select(.ParameterKey == "CertificateAuthorities") | .ParameterValue) |= "'$(jq '.ignition.security.tls.certificateAuthorities[].source' -r $DIR/master.ign)'")' \
-| jq 'map((select(.ParameterKey == "MasterInstanceProfileName") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-security MasterInstanceProfile)'")' \
+| jq 'map((select(.ParameterKey == "MasterInstanceProfileName") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-iam MasterInstanceProfile)'")' \
 | jq 'map((select(.ParameterKey == "RegisterNlbIpTargetsLambdaArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra RegisterNlbIpTargetsLambda)'")' \
 | jq 'map((select(.ParameterKey == "ExternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra ExternalApiTargetGroupArn)'")' \
 | jq 'map((select(.ParameterKey == "InternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalApiTargetGroupArn)'")' \
@@ -116,10 +115,10 @@ cat templates/05.json | jq 'map((select(.ParameterKey == "InfrastructureName") |
 # Populate worker nodes with needed config from upstream stacks
 cat templates/06.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' \
 | jq 'map((select(.ParameterKey == "Subnet") | .ParameterValue) |= "'$(echo $PRIVATE_SUBNET_IDS)'")' \
-| jq 'map((select(.ParameterKey == "WorkerSecurityGroupId") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-security WorkerSecurityGroupId)'")' \
+| jq 'map((select(.ParameterKey == "WorkerSecurityGroupId") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-network-security WorkerSecurityGroupId)'")' \
 | jq 'map((select(.ParameterKey == "IgnitionLocation") | .ParameterValue) |= "'$(echo "https://api-int.$DIR.$HOSTED_ZONE_NAME:22623/config/worker")'")' \
 | jq 'map((select(.ParameterKey == "CertificateAuthorities") | .ParameterValue) |= "'$(jq '.ignition.security.tls.certificateAuthorities[].source' -r $DIR/worker.ign)'")' \
-| jq 'map((select(.ParameterKey == "WorkerInstanceProfileName") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-security WorkerInstanceProfile)'")' \
+| jq 'map((select(.ParameterKey == "WorkerInstanceProfileName") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-iam WorkerInstanceProfile)'")' \
 | jq 'map((select(.ParameterKey == "RegisterNlbIpTargetsLambdaArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra RegisterNlbIpTargetsLambda)'")' \
 | jq 'map((select(.ParameterKey == "ExternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra ExternalApiTargetGroupArn)'")' \
 | jq 'map((select(.ParameterKey == "InternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalApiTargetGroupArn)'")' \
