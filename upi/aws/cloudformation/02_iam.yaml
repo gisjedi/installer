@@ -1,0 +1,226 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Template for OpenShift Cluster IAM Support
+
+Parameters:
+  InfrastructureName:
+    AllowedPattern: ^([a-zA-Z][a-zA-Z0-9\-]{0,26})$
+    MaxLength: 27
+    MinLength: 1
+    ConstraintDescription: Infrastructure name must be alphanumeric, start with a letter, and have a maximum of 27 characters.
+    Description: A short, unique cluster ID used to tag cloud resources and identify items owned or used by the cluster.
+    Type: String
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: "Cluster Information"
+      Parameters:
+      - ClusterName
+      - InfrastructureName
+    - Label:
+        default: "Network Configuration"
+      Parameters:
+      - VpcId
+      - PublicSubnets
+      - PrivateSubnets
+    - Label:
+        default: "DNS"
+      Parameters:
+      - HostedZoneName
+      - HostedZoneId
+    ParameterLabels:
+      ClusterName:
+        default: "Cluster Name"
+      InfrastructureName:
+        default: "Infrastructure Name"
+      VpcId:
+        default: "VPC ID"
+      PublicSubnets:
+        default: "Public Subnets"
+      PrivateSubnets:
+        default: "Private Subnets"
+      HostedZoneName:
+        default: "Public Hosted Zone Name"
+      HostedZoneId:
+        default: "Public Hosted Zone ID"
+
+Resources:
+  RegisterTargetLambdaIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ["-", [!Ref InfrastructureName, "nlb", "lambda", "role"]]
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: "Allow"
+          Principal:
+            Service:
+            - "lambda.amazonaws.com"
+          Action:
+          - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+      - PolicyName: !Join ["-", [!Ref InfrastructureName, "master", "policy"]]
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: "Allow"
+            Action:
+              [
+                "elasticloadbalancing:RegisterTargets",
+                "elasticloadbalancing:DeregisterTargets",
+              ]
+            Resource: "*" #!Ref InternalApiTargetGroup # !Ref InternalServiceTargetGroup #!Ref ExternalApiTargetGroup
+
+  RegisterSubnetTagsLambdaIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ["-", [!Ref InfrastructureName, "subnet-tags-lambda-role"]]
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: "Allow"
+          Principal:
+            Service:
+            - "lambda.amazonaws.com"
+          Action:
+          - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+      - PolicyName: !Join ["-", [!Ref InfrastructureName, "subnet-tagging-policy"]]
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: "Allow"
+            Action:
+              [
+                "ec2:DeleteTags",
+                "ec2:CreateTags"
+              ]
+            Resource: "arn:aws:ec2:*:*:subnet/*"
+          - Effect: "Allow"
+            Action:
+              [
+                "ec2:DescribeSubnets",
+                "ec2:DescribeTags"
+              ]
+            Resource: "*"
+
+  MasterIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: "Allow"
+          Principal:
+            Service:
+            - "ec2.amazonaws.com"
+          Action:
+          - "sts:AssumeRole"
+      Policies:
+      - PolicyName: !Join ["-", [!Ref InfrastructureName, "master", "policy"]]
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: "Allow"
+            Action: "ec2:*"
+            Resource: "*"
+          - Effect: "Allow"
+            Action: "elasticloadbalancing:*"
+            Resource: "*"
+          - Effect: "Allow"
+            Action: "iam:PassRole"
+            Resource: "*"
+          - Effect: "Allow"
+            Action: "s3:GetObject"
+            Resource: "*"
+
+  MasterInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Roles:
+      - Ref: "MasterIamRole"
+
+  WorkerIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: "Allow"
+          Principal:
+            Service:
+            - "ec2.amazonaws.com"
+          Action:
+          - "sts:AssumeRole"
+      Policies:
+      - PolicyName: !Join ["-", [!Ref InfrastructureName, "worker", "policy"]]
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: "Allow"
+            Action: "ec2:Describe*"
+            Resource: "*"
+
+  WorkerInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Roles:
+      - Ref: "WorkerIamRole"
+
+  BootstrapIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: "Allow"
+          Principal:
+            Service:
+            - "ec2.amazonaws.com"
+          Action:
+          - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+      - PolicyName: !Join ["-", [!Ref InfrastructureName, "bootstrap", "policy"]]
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: "Allow"
+            Action: "ec2:Describe*"
+            Resource: "*"
+          - Effect: "Allow"
+            Action: "ec2:AttachVolume"
+            Resource: "*"
+          - Effect: "Allow"
+            Action: "ec2:DetachVolume"
+            Resource: "*"
+          - Effect: "Allow"
+            Action: "s3:GetObject"
+            Resource: "*"
+
+  BootstrapInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles:
+      - Ref: "BootstrapIamRole"
+
+Outputs:
+  RegisterTargetLambdaIamRoleArn:
+    Description: Role for Lambda to perform target group registerations
+    Value: !Ref RegisterTargetLambdaIamRole
+  RegisterSubnetTagsLambdaIamRole:
+    Description: Role for Lambda to apply tags to subnet resources
+    Value: !Ref RegisterSubnetTagsLambdaIamRole
+  MasterInstanceProfile:
+    Description: Master IAM Instance Profile
+    Value: !Ref MasterInstanceProfile
+  WorkerInstanceProfile:
+    Description: Worker IAM Instance Profile
+    Value: !Ref WorkerInstanceProfile
+  BootstrapInstanceProfile:
+    Description: Bootstrap IAM Instance Profile
+    Value: !Ref BootstrapInstanceProfile

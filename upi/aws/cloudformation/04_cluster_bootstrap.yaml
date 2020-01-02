@@ -27,6 +27,9 @@ Parameters:
   VpcId:
     Description: The VPC-scoped resources will belong to this VPC.
     Type: AWS::EC2::VPC::Id
+  BootstrapInstanceProfileName:
+    Description: IAM profile to associate with bootstrap node.
+    Type: String
   BootstrapIgnitionLocation:
     Default: s3://my-s3-bucket/bootstrap.ign
     Description: Ignition config file location.
@@ -62,6 +65,7 @@ Metadata:
         default: "Host Information"
       Parameters:
       - RhcosAmi
+      - BootstrapInstanceProfileName
       - BootstrapIgnitionLocation
       - MasterSecurityGroupId
     - Label:
@@ -89,6 +93,8 @@ Metadata:
         default: "Public Subnet"
       RhcosAmi:
         default: "Red Hat Enterprise Linux CoreOS AMI ID"
+      BootstrapInstanceProfileName:
+        default: "Bootstrap instance profile"
       BootstrapIgnitionLocation:
         default: "Bootstrap Ignition Source"
       MasterSecurityGroupId:
@@ -100,43 +106,7 @@ Conditions:
   DoRegistration: !Equals ["yes", !Ref AutoRegisterELB]
 
 Resources:
-  BootstrapIamRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-        - Effect: "Allow"
-          Principal:
-            Service:
-            - "ec2.amazonaws.com"
-          Action:
-          - "sts:AssumeRole"
-      Path: "/"
-      Policies:
-      - PolicyName: !Join ["-", [!Ref InfrastructureName, "bootstrap", "policy"]]
-        PolicyDocument:
-          Version: "2012-10-17"
-          Statement:
-          - Effect: "Allow"
-            Action: "ec2:Describe*"
-            Resource: "*"
-          - Effect: "Allow"
-            Action: "ec2:AttachVolume"
-            Resource: "*"
-          - Effect: "Allow"
-            Action: "ec2:DetachVolume"
-            Resource: "*"
-          - Effect: "Allow"
-            Action: "s3:GetObject"
-            Resource: "*"
 
-  BootstrapInstanceProfile:
-    Type: "AWS::IAM::InstanceProfile"
-    Properties:
-      Path: "/"
-      Roles:
-      - Ref: "BootstrapIamRole"
 
   BootstrapSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -157,7 +127,7 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !Ref RhcosAmi
-      IamInstanceProfile: !Ref BootstrapInstanceProfile
+      IamInstanceProfile: !Ref BootstrapInstanceProfileName
       InstanceType: "i3.large"
       NetworkInterfaces:
       - AssociatePublicIpAddress: "true"
