@@ -24,6 +24,10 @@
     "ParameterValue": "vpc-075b3a058c5be34d9" 
   },
   {
+    "ParameterKey": "BootstrapInstanceProfileName", 
+    "ParameterValue": "ocp-security-BootstrapInstanceProfile-XF5DJW87ZJ2G" 
+  },
+  {
     "ParameterKey": "BootstrapIgnitionLocation", 
     "ParameterValue": "s3://gisjedi-test-infra/bootstrap.ign" 
   },
