@@ -16,34 +16,10 @@ Metadata:
     - Label:
         default: "Cluster Information"
       Parameters:
-      - ClusterName
       - InfrastructureName
-    - Label:
-        default: "Network Configuration"
-      Parameters:
-      - VpcId
-      - PublicSubnets
-      - PrivateSubnets
-    - Label:
-        default: "DNS"
-      Parameters:
-      - HostedZoneName
-      - HostedZoneId
     ParameterLabels:
-      ClusterName:
-        default: "Cluster Name"
       InfrastructureName:
         default: "Infrastructure Name"
-      VpcId:
-        default: "VPC ID"
-      PublicSubnets:
-        default: "Public Subnets"
-      PrivateSubnets:
-        default: "Private Subnets"
-      HostedZoneName:
-        default: "Public Hosted Zone Name"
-      HostedZoneId:
-        default: "Public Hosted Zone ID"
 
 Resources:
   RegisterTargetLambdaIamRole:
