@@ -30,5 +30,13 @@
   {
     "ParameterKey": "PublicSubnets",
     "ParameterValue": "subnet-0626a327b93190e2f"
+  },
+  {
+    "ParameterKey": "RegisterTargetLambdaIamRoleArn",
+    "ParameterValue": "subnet-043af5ab228df1387"
+  },
+  {
+    "ParameterKey": "RegisterSubnetTagsLambdaIamRoleArn",
+    "ParameterValue": "subnet-0655930e5baae71b0"
   }
 ]

@@ -38,6 +38,12 @@ Parameters:
   PublicSubnets:
     Description: The internet-facing subnets.
     Type: List<AWS::EC2::Subnet::Id>
+  RegisterTargetLambdaIamRoleArn:
+    Description: ARN of Role for Lambda to perform target group registrations
+    Type: String
+  RegisterSubnetTagsLambdaIamRoleArn:
+    Description: ARN of Role for Lambda to apply tags to subnet resources
+    Type: String
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -228,10 +234,7 @@ Resources:
     Type: "AWS::Lambda::Function"
     Properties:
       Handler: "index.handler"
-      Role:
-        Fn::GetAtt:
-        - "RegisterTargetLambdaIamRole"
-        - "Arn"
+      Role: !Ref RegisterTargetLambdaIamRoleArn
       Code:
         ZipFile: |
           import json
@@ -248,48 +251,11 @@ Resources:
       Runtime: "python3.7"
       Timeout: 120
 
-  RegisterSubnetTagsLambdaIamRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Join ["-", [!Ref InfrastructureName, "subnet-tags-lambda-role"]]
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-        - Effect: "Allow"
-          Principal:
-            Service:
-            - "lambda.amazonaws.com"
-          Action:
-          - "sts:AssumeRole"
-      Path: "/"
-      Policies:
-      - PolicyName: !Join ["-", [!Ref InfrastructureName, "subnet-tagging-policy"]]
-        PolicyDocument:
-          Version: "2012-10-17"
-          Statement:
-          - Effect: "Allow"
-            Action:
-              [
-                "ec2:DeleteTags",
-                "ec2:CreateTags"
-              ]
-            Resource: "arn:aws:ec2:*:*:subnet/*"
-          - Effect: "Allow"
-            Action:
-              [
-                "ec2:DescribeSubnets",
-                "ec2:DescribeTags"
-              ]
-            Resource: "*"
-
   RegisterSubnetTags:
     Type: "AWS::Lambda::Function"
     Properties:
       Handler: "index.handler"
-      Role:
-        Fn::GetAtt:
-        - "RegisterSubnetTagsLambdaIamRole"
-        - "Arn"
+      Role: !Ref RegisterSubnetTagsLambdaIamRoleArn
       Code:
         ZipFile: |
           import json

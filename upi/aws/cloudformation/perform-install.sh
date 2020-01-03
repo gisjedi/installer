@@ -66,18 +66,23 @@ VPC_ID="$(sh scripts/cf-output.sh $INF_NAME-vpc VpcId)"
 
 cat templates/02.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' > $DIR/02.json
 
+
+
+# Deploy infrastructure and security stacks
+aws cloudformation create-stack --stack-name $INF_NAME-iam --template-body file://02_iam.yaml --parameters file://$DIR/02.json --capabilities CAPABILITY_NAMED_IAM || true
+sh scripts/stack-wait.sh $INF_NAME-iam
+
 cat templates/03.json | jq 'map((select(.ParameterKey == "ClusterName") | .ParameterValue) |= "'$(echo $DIR)'")' \
 | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' \
 | jq 'map((select(.ParameterKey == "HostedZoneId") | .ParameterValue) |= "'$(echo $HOSTED_ZONE_ID)'")' \
 | jq 'map((select(.ParameterKey == "HostedZoneName") | .ParameterValue) |= "'$(echo $HOSTED_ZONE_NAME)'")' \
 | jq 'map((select(.ParameterKey == "PublicSubnets") | .ParameterValue) |= "'$(echo $PUBLIC_SUBNET_IDS)'")' \
 | jq 'map((select(.ParameterKey == "PrivateSubnets") | .ParameterValue) |= "'$(echo $PRIVATE_SUBNET_IDS)'")' \
-| jq 'map((select(.ParameterKey == "VpcId") | .ParameterValue) |= "'$(echo $VPC_ID)'")' > $DIR/03.json
+| jq 'map((select(.ParameterKey == "VpcId") | .ParameterValue) |= "'$(echo $VPC_ID)'")' \
+| jq 'map((select(.ParameterKey == "RegisterTargetLambdaIamRoleArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-iam RegisterTargetLambdaIamRoleArn)'")' \
+| jq 'map((select(.ParameterKey == "RegisterSubnetTagsLambdaIamRoleArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-iam RegisterSubnetTagsLambdaIamRoleArn)'")' > $DIR/03.json
 
-# Deploy infrastructure and security stacks
-aws cloudformation create-stack --stack-name $INF_NAME-iam --template-body file://02_iam.yaml --parameters file://$DIR/02.json --capabilities CAPABILITY_NAMED_IAM || true
 aws cloudformation create-stack --stack-name $INF_NAME-network-security --template-body file://03_cluster_network_security.yaml --parameters file://$DIR/03.json || true
-sh scripts/stack-wait.sh $INF_NAME-iam
 sh scripts/stack-wait.sh $INF_NAME-network-security
 
 cat templates/04.json | jq 'map((select(.ParameterKey == "InfrastructureName") | .ParameterValue) |= "'$(echo $INF_NAME)'")' \
@@ -123,7 +128,6 @@ cat templates/06.json | jq 'map((select(.ParameterKey == "InfrastructureName") |
 | jq 'map((select(.ParameterKey == "ExternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra ExternalApiTargetGroupArn)'")' \
 | jq 'map((select(.ParameterKey == "InternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalApiTargetGroupArn)'")' \
 | jq 'map((select(.ParameterKey == "InternalServiceTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-infra InternalServiceTargetGroupArn)'")' > $DIR/06.json
-
 
 # Create master nodes
 aws cloudformation create-stack --stack-name $INF_NAME-master --template-body file://05_cluster_master_nodes.yaml --parameters file://$DIR/05.json

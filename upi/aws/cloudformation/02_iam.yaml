@@ -186,11 +186,11 @@ Resources:
 
 Outputs:
   RegisterTargetLambdaIamRoleArn:
-    Description: Role for Lambda to perform target group registerations
-    Value: !Ref RegisterTargetLambdaIamRole
-  RegisterSubnetTagsLambdaIamRole:
-    Description: Role for Lambda to apply tags to subnet resources
-    Value: !Ref RegisterSubnetTagsLambdaIamRole
+    Description: ARN of Role for Lambda to perform target group registrations
+    Value: !GetAtt  RegisterTargetLambdaIamRole.Arn
+  RegisterSubnetTagsLambdaIamRoleArn:
+    Description: ARN of Role for Lambda to apply tags to subnet resources
+    Value: !GetAtt RegisterSubnetTagsLambdaIamRole.Arn
   MasterInstanceProfile:
     Description: Master IAM Instance Profile
     Value: !Ref MasterInstanceProfile
