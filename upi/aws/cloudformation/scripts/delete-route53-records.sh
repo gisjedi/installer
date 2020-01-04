@@ -5,6 +5,12 @@
 HOSTED_ZONE_ID="$(aws route53 list-hosted-zones-by-name --dns-name $1 | jq '.HostedZones[0].Id' -r | cut -d/ -f3)"
 DELETE=${2:-false}
 
+if [ "${HOSTED_ZONE_ID}" == "null" ]
+then
+    echo 'DNS Name not found'
+    exit 1
+fi
+
 aws route53 list-resource-record-sets \
   --hosted-zone-id $HOSTED_ZONE_ID |
 jq -c '.ResourceRecordSets[]' |
@@ -22,5 +28,8 @@ done
 
 if [ "$DELETE" == "true" ]
 then
+    echo Deleting hosted zone $1
     aws route53 delete-hosted-zone --id $HOSTED_ZONE_ID
+else
+    echo Hosted zone $1 remains.
 fi

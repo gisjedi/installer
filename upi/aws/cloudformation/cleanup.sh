@@ -30,8 +30,8 @@ for WORKER_ID in $(seq 1 $WORKER_COUNT); do sh scripts/delete-wait.sh $INF_NAME-
 
 # Cleanup dynamically generated componments
 aws elb delete-load-balancer --load-balancer-name $(aws resourcegroupstaggingapi get-resources --tag-filters Key=kubernetes.io/cluster/nodes-qsfw4,Values=owned --resource-type-filters elasticloadbalancing | jq '.ResourceTagMappingList[].ResourceARN' -r | cut -d/ -f2)
+sh scripts/delete-route53-records.sh $DIR.$HOSTED_ZONE_NAME true
 sh scripts/delete-route53-records.sh $HOSTED_ZONE_NAME
-sh scripts/delete-route53-records.sh nodes-$HOSTED_ZONE_NAME true
 
 # Remove all virtual network components
 aws cloudformation delete-stack --stack-name $INF_NAME-network-security
