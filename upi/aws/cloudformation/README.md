@@ -14,7 +14,7 @@ You must also pre-configure 3 things prior to launching the script:
 
 * Login credentials for AWS capable of full administrator access (accomplished with `aws configure`)
 * `HOSTED_ZONE_NAME` environment variable. This must match the name of a Route53 Hosted Zone in your account.
-* `PULL_SECRET` environment variable. This can be retreived from https://cloud.redhat.com/openshift/install/aws/installer-provisioned
+* `PULL_SECRET` environment variable. This can be retreived from https://cloud.redhat.com/openshift/install/aws/installer-provisioned. It can be set with `export PULL_SECRET='value'`. Single quotes are needed to ensure value is set properly if pasting directly.
 
 Additional optional environment variables can be set and are documented within the `perform-install.sh` file.
 
@@ -37,6 +37,15 @@ watch -n5 oc get clusteroperators
 
 # Watch Master and Worker nodes status
 watch -n5 oc get nodes
+```
+
+## Cleanup
+
+OpenStack dynamically creates an ingress load balancer and associated DNS entries that are not called out in the CloudFormation stacks. As a result, simply deleting the stacks will not fully remove the deployment. The following command will destroy the stacks in the proper order and remove the dynamically created resources:
+
+```
+# Assuming the same execution environment as install above as it needs to pull from the config directory.
+sh cleanup.sh
 ```
 
 ## Notes
