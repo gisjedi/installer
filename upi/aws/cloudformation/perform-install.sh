@@ -47,12 +47,12 @@ yq w -i $DIR/manifests/cluster-scheduler-02-config.yml spec.mastersSchedulable f
 # Create ignition configs from the K8s manifests
 openshift-install create ignition-configs --dir=$DIR
 
-# Copy bootstrap ignition to bucket
-aws s3 mb s3://$BUCKET --region $REGION || true
-aws s3 cp $DIR/bootstrap.ign s3://$BUCKET/$DIR/bootstrap.ign
-
 # Grab auto-generated infrastructure name 
 export INF_NAME=$(jq -r .infraID $DIR/metadata.json)
+
+# Copy bootstrap ignition to bucket
+aws s3 mb s3://$BUCKET --region $REGION || true
+aws s3 cp $DIR/bootstrap.ign s3://$BUCKET/$INF_NAME/bootstrap.ign
 
 # Deploy VPC stack
 aws cloudformation create-stack --stack-name $INF_NAME-vpc --template-body file://01_vpc.yaml --parameters file://templates/01.json || true
@@ -88,7 +88,7 @@ cat templates/04.json | jq 'map((select(.ParameterKey == "InfrastructureName") |
 | jq 'map((select(.ParameterKey == "MasterSecurityGroupId") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-network-security MasterSecurityGroupId)'")' \
 | jq 'map((select(.ParameterKey == "VpcId") | .ParameterValue) |= "'$(echo $VPC_ID)'")' \
 | jq 'map((select(.ParameterKey == "BootstrapInstanceProfileName") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-iam BootstrapInstanceProfile)'")' \
-| jq 'map((select(.ParameterKey == "BootstrapIgnitionLocation") | .ParameterValue) |= "'$(echo s3://$BUCKET/$DIR/bootstrap.ign)'")' \
+| jq 'map((select(.ParameterKey == "BootstrapIgnitionLocation") | .ParameterValue) |= "'$(echo s3://$BUCKET/$INF_NAME/bootstrap.ign)'")' \
 | jq 'map((select(.ParameterKey == "RegisterNlbIpTargetsLambdaArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-network-security RegisterNlbIpTargetsLambda)'")' \
 | jq 'map((select(.ParameterKey == "ExternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-network-security ExternalApiTargetGroupArn)'")' \
 | jq 'map((select(.ParameterKey == "InternalApiTargetGroupArn") | .ParameterValue) |= "'$(sh scripts/cf-output.sh $INF_NAME-network-security InternalApiTargetGroupArn)'")' \
