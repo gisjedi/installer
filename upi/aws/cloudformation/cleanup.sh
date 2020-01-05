@@ -29,7 +29,7 @@ sh scripts/delete-wait.sh $INF_NAME-bootstrap
 for WORKER_ID in $(seq 1 $WORKER_COUNT); do sh scripts/delete-wait.sh $INF_NAME-worker-$WORKER_ID; done
 
 # Cleanup dynamically generated componments
-aws elb delete-load-balancer --load-balancer-name $(aws resourcegroupstaggingapi get-resources --tag-filters Key=kubernetes.io/cluster/${DIR}-${INF_NAME},Values=owned --resource-type-filters elasticloadbalancing | jq '.ResourceTagMappingList[].ResourceARN' -r | cut -d/ -f2)
+aws elb delete-load-balancer --load-balancer-name $(aws resourcegroupstaggingapi get-resources --tag-filters Key=kubernetes.io/cluster/${INF_NAME},Values=owned --resource-type-filters elasticloadbalancing | jq '.ResourceTagMappingList[].ResourceARN' -r | cut -d/ -f2) || true
 sh scripts/delete-route53-records.sh $DIR.$HOSTED_ZONE_NAME true
 sh scripts/delete-route53-records.sh $HOSTED_ZONE_NAME
 
